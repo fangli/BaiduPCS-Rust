@@ -21,7 +21,7 @@ BaiduPCS-Rust 是一个使用 Rust 和 Vue 3 构建的现代化百度网盘第�
 
 本项目参考并受到了以下优秀项目的启发：
 
-- [qjfoidnh/BaiduPCS-Go](https://github.com/qjfoidnh/BaiduPCS-Go) - iikira/BaiduPCS-Go 原版基础上集成了分享链接/秒传链接转存功能
+- [qjfoidnh/BaiduPCS-Go](https://github.com/qjfoidnh/BaiduPCS-Go) - BaiduPCS-Go 的增强版本，提供分享链接/秒传链接转存功能
 - [GangZhuo/BaiduPCS](https://github.com/GangZhuo/BaiduPCS) - 百度网盘命令行客户端
 
 感谢这些项目的开源贡献，为本项目的开发提供了重要参考。
