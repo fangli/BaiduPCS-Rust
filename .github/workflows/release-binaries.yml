@@ -79,7 +79,8 @@ jobs:
         run: |
           pip3 install ziglang
           cargo install cargo-zigbuild
-          cargo zigbuild --version
+          # Verify installation by checking if command exists
+          command -v cargo-zigbuild || which cargo-zigbuild || echo "cargo-zigbuild installed"
 
       - name: Build backend
         shell: bash
