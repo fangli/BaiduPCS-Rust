@@ -3,6 +3,7 @@ use axum::{
     Router,
 };
 use baidu_netdisk_rust::{server::handlers, AppState};
+use std::path::PathBuf;
 use tower::ServiceBuilder;
 use tower_http::{
     cors::{Any, CorsLayer},
@@ -70,8 +71,27 @@ async fn main() -> anyhow::Result<()> {
         .with_state(app_state.clone());
 
     // 静态文件服务（前端资源）
-    let static_service = ServeDir::new("../frontend/dist")
-        .not_found_service(ServeFile::new("../frontend/dist/index.html"));
+    // 获取可执行文件所在目录，然后查找前端静态文件
+    let exe_path = std::env::current_exe()?;
+    let exe_dir = exe_path.parent().unwrap_or(std::path::Path::new("."));
+    
+    // 尝试多个可能的前端路径
+    let frontend_dirs = [
+        exe_dir.join("frontend/dist"),           // 打包后的目录结构
+        exe_dir.join("../frontend/dist"),         // 开发环境
+        exe_dir.join("../../frontend/dist"),      // 其他可能的结构
+        PathBuf::from("./frontend/dist"),         // 当前目录
+    ];
+    
+    let frontend_dir = frontend_dirs
+        .iter()
+        .find(|path| path.exists() && path.join("index.html").exists())
+        .ok_or_else(|| anyhow::anyhow!("找不到前端静态文件目录，请确保 frontend/dist 目录存在"))?;
+    
+    info!("前端静态文件目录: {}", frontend_dir.display());
+    
+    let static_service = ServeDir::new(frontend_dir)
+        .not_found_service(ServeFile::new(frontend_dir.join("index.html")));
 
     // 构建完整应用
     let app = Router::new()
