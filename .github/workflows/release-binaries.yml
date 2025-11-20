@@ -84,11 +84,16 @@ jobs:
 
       - name: Build backend
         shell: bash
+        env:
+          OPENSSL_STATIC: 1
+          OPENSSL_VENDORED: 1
         run: |
           set -e
           cd backend
           if [ "${{ matrix.use_zigbuild }}" = "true" ]; then
             echo "Building with cargo-zigbuild for ${{ matrix.target }}..."
+            # Enable OpenSSL vendored for cross-compilation to musl targets
+            # This tells openssl-sys to compile OpenSSL from source
             cargo zigbuild --release --target ${{ matrix.target }}
           else
             echo "Building with cargo for ${{ matrix.target }}..."
