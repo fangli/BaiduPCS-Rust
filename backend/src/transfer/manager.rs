@@ -3755,6 +3755,7 @@ impl TransferManager {
 }
 
 /// 逐级确保网盘路径存在，已存在的目录跳过创建，避免百度 API 静默重命名。
+/// 一旦发现某层不存在，后续子目录直接创建不再检查（父不存在则子必不存在）。
 async fn ensure_dirs_exist(client: &NetdiskClient, path: &str) -> Result<()> {
     let path = path.trim_end_matches('/');
     if path.is_empty() {
@@ -3762,44 +3763,32 @@ async fn ensure_dirs_exist(client: &NetdiskClient, path: &str) -> Result<()> {
     }
     let segments: Vec<&str> = path.split('/').filter(|s| !s.is_empty()).collect();
     let mut cumulative = String::new();
-    for (i, seg) in segments.iter().enumerate() {
+    let mut parent_missing = false;
+    for seg in &segments {
         let parent = if cumulative.is_empty() { "/".to_string() } else { cumulative.clone() };
         cumulative.push('/');
         cumulative.push_str(seg);
 
-        let exists = match client.get_file_list(&parent, 1, 1000).await {
-            Ok(list) => list.list.iter().any(|f| {
-                f.isdir == 1 && f.path.trim_end_matches('/') == cumulative
-            }),
-            Err(e) => {
-                warn!("检查目录是否存在失败，将尝试创建: {} error={}", cumulative, e);
-                false
+        if !parent_missing {
+            let exists = match client.get_file_list(&parent, 1, 1000).await {
+                Ok(list) => list.list.iter().any(|f| {
+                    f.isdir == 1 && f.path.trim_end_matches('/') == cumulative
+                }),
+                Err(e) => {
+                    warn!("检查目录是否存在失败，将尝试创建: {} error={}", cumulative, e);
+                    false
+                }
+            };
+            if exists {
+                info!("目录已存在，跳过创建: {}", cumulative);
+                continue;
             }
-        };
-
-        if exists {
-            info!("目录已存在，跳过创建: {}", cumulative);
-            continue;
+            parent_missing = true;
         }
 
         info!("创建目录: {}", cumulative);
-        match client.create_folder(&cumulative).await {
-            Ok(resp) => {
-                let actual = resp.path.trim_end_matches('/');
-                if !actual.is_empty() && actual != cumulative {
-                    warn!("目录被百度重命名: 期望={}, 实际={}", cumulative, actual);
-                    let _ = client.delete_files(&[actual.to_string()]).await;
-                    if i == segments.len() - 1 {
-                        anyhow::bail!("创建目录失败: 路径被百度重命名为 {}", actual);
-                    }
-                }
-            }
-            Err(e) => {
-                let err_msg = e.to_string();
-                if !err_msg.contains("errno=-8") {
-                    warn!("创建目录失败（可能已存在）: {} error={}", cumulative, err_msg);
-                }
-            }
+        if let Err(e) = client.create_folder(&cumulative).await {
+            warn!("创建目录失败: {} error={}", cumulative, e);
         }
     }
     Ok(())
